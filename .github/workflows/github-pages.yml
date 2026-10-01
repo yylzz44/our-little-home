@@ -1,0 +1,43 @@
+name: Deploy our little home
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://txfmjcshuzvnlmjyplmd.supabase.co' }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_YkqmAZp0W_nDhqzbdg-wRA_svsM4Uz8' }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned package manager
+        run: npm install --global pnpm@11.25.0
+      - run: pnpm install --frozen-lockfile
+      - name: Validate public configuration
+        run: node scripts/check-public-config.mjs
+      - run: pnpm test:github
+      - run: pnpm build:github
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist-github
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
